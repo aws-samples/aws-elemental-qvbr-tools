@@ -5,6 +5,6 @@ And go [here](https://aws.amazon.com/blogs/media/how-to-use-qvbr-for-streaming-l
 
 The visualization tool provided here ultimately produces a webpage that shows the comparative bitrate usage of the HLS videos generated using different rate control modes against QVBR in realtime. This then allows the user to see the bitrate savings one can get from using QVBR mode.
 
-To launch the Live QVBR Viewer, go [here](Live/README.md).
+Launch the [Live QVBR Viewer](Live/README.md).
 
-To launch the VOD QVBR Viewer, go [here](VOD/README.md).
+Launch the [VOD QVBR Viewer](VOD/README.md).

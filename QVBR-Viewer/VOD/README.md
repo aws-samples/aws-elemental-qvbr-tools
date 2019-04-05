@@ -8,10 +8,12 @@ The visualization tool provided here ultimately produces a webpage that shows th
 ## Limitations and Assumptions
 
 1. The tool doesn't automatically generate any of the video content for you. Guidance is provided on how to manually do this. 
-1. The user is familiar with creating AWS Elemental MediaConvert jobs via the AWS Console and/or AWS CLI.
-1. Templates provided here are for creating an AWS Elemental MediaConvert job. However, they can be used as guides to create an equivalent AWS Elemental Server job respectively. MediaConnect and QVBR guidelines can be found [here](https://docs.aws.amazon.com/mediaconvert/latest/ug/cbr-vbr-qvbr.html).
 1. An Amazon S3 private bucket is created by the CloudFormation template where the video you generate is expected to be written for analysis.
 1. The tool supports HLS up to HD. 
+1. The user is familiar with the AWS console and has rights to deploy templates using the AWS CloudFormation service.
+1. The user is familiar with creating AWS Elemental MediaConvert jobs via the AWS Console and/or AWS CLI.
+1. The user has access to video content that's going to be used as an AWS Elemental MediaConvert input. See [supported input codecs and containers](https://docs.aws.amazon.com/mediaconvert/latest/ug/reference-codecs-containers-input.html).
+1. The template provided here is for creating an AWS Elemental MediaConvert job. However, it can be used as a guide to create an equivalent AWS Elemental Server job respectively. MediaConnect and QVBR guidelines can be found [here](https://docs.aws.amazon.com/mediaconvert/latest/ug/cbr-vbr-qvbr.html).
 
 
 ## Deploy the VOD Viewer
