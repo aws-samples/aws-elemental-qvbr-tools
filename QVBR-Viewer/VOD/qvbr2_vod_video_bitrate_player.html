@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="icon" href="favicon.ico">
+  <style>
+    :root {
+      --numViewers: 2;
+    }
+
+    body {
+      font-family: "lucida grande", "lucida sans unicode", helvetica, arial, sans-serif;
+      font-size: 13px;
+      margin: 0 auto;
+      background-color: #333;
+    }
+
+    .heading {
+      background-color: #333;
+      color: rgb(255, 154, 0);
+      margin: 0 auto;
+      padding-left: 2px;
+    }
+
+    .content-bkg {
+      background-color: #ffffff;
+      margin: 0 auto;
+    }
+
+    .smalltextinput,
+    textarea {
+      background-color: #333;
+      color: rgb(255, 154, 0);
+      border-style: none;
+    }
+
+    .highlight_text {
+      color: rgb(255, 154, 0);
+      font-weight: bold;
+    }
+
+    select {
+      background-color: #333;
+      color: rgb(255, 154, 0);
+    }
+
+    .menu {
+      background-color: #333;
+      color: rgb(255, 154, 0);
+      margin: 0 auto;
+      padding: 2px;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    table,
+    th,
+    td {
+      border: 1px solid rgb(255, 154, 0);
+      text-align: center;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+    
+    th.highlight {
+      background-color: rgba(255, 154, 0, 0.8);
+      color: rgb(255, 255, 255);
+    }
+
+    button {
+      background-color: rgba(255, 154, 0, 0.8);
+      color: rgb(255, 255, 255);
+      border: 2px solid rgba(255, 180, 26, 0.8);
+    }
+
+    a {
+      /* color: rgb(255, 154, 0); */
+      color: rgb(255, 255, 255);
+    }
+
+    .content {
+      background-color: #333;
+      color: rgb(255, 154, 0);
+      position: relative;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .videos-container {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(var(--numViewers), 1fr);
+      grid-gap: 0px 0px;
+    }
+
+    .videos-item {
+      position: relative;
+    }
+
+    .videos-item video {
+      width: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    .videos-item>.hlsjsoverlay {
+      margin: 0 auto;
+      position: absolute;
+      bottom: 32px;
+      right: 0px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: rgb(255, 154, 0);
+      z-index: 2;
+    }
+
+    .videos-item>.videoInfoOverlay {
+      margin: 0 auto;
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: rgb(255, 154, 0);
+      top: 5%;
+      left: 0px;
+      font-size: 1.5em;
+      z-index: 2;
+    }
+
+    .content-overlay-top {
+      width: 100%;
+      margin: 0 auto;
+      position: sticky;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: rgb(255, 154, 0);
+      top: 0;
+      display: grid;
+      grid-template-columns: 5% 25% 45% 20%;
+      align-items: center;
+      justify-items: center;
+      z-index: 100;
+    }
+
+    #topNAV a:link,
+    #topNAV a:visited {
+      width: 5em;
+      height: 1.5em;
+      padding: 1px 3px;
+      text-align: left;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    #topNAV a:hover,
+    #topNAV a:active {
+      background-color: rgba(255, 154, 0, 0.8);
+      color: rgb(255, 255, 255);
+    }
+
+    #topNAV .currentlink {
+      background-color: rgba(255, 154, 0, 0.8);
+      color: rgb(255, 255, 255);
+    }
+
+    #topNAV .otherlink {
+      color: rgb(255, 154, 0);
+    }
+
+    .content-overlay-bottom {
+      width: 100%;
+      margin: 0 auto;
+      position: fixed;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: rgb(255, 154, 0);
+      bottom: 0;
+      display: grid;
+      grid-template-columns: 90% 10%;
+      align-items: center;
+      z-index: 100;
+    }
+
+    div.bitrateChartTitle {
+      text-align: center;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="qvbr2_vod_common.js"></script>
+  <script>  
+    //main player only
+    function getTimeIntervalString(interval_msec) {
+      seconds = Math.round(interval_msec / 1000);
+
+      minutes = Math.round(seconds / 60);
+      days = Math.floor(minutes / (24 * 60));
+      hours = Math.floor(minutes / 60) % 24;
+      minutes = minutes % 60;
+
+      var timeStr = "";
+
+      if (seconds >= 60) {
+        if (days) timeStr += ((timeStr) ? " " : "") + days + " d";
+        if (hours) timeStr += ((timeStr) ? " " : "") + hours + " hr";
+        if (minutes) timeStr += ((timeStr) ? " " : "") + minutes + " min";
+      }
+      else {
+        timeStr += seconds + "s";
+      }
+
+      return timeStr;
+    }
+
+    function drawBitrateGraph() {
+      var bShowIndexInput = false;
+
+      document.getElementById("bitrateChartTitle").innerHTML = "Segment Bitrates (entire asset)";
+
+      var ctx = document.getElementById("bitrateChart");
+      var datasets = [];
+
+      //Chart.defaults.global.defaultFontColor = '#ece7e7';
+      //Chart.defaults.global.legend = 'false';
+
+      if (chartBitrate == undefined) {
+        chartConfig = {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: []
+          },
+          options: {
+            legend: false,
+            layout: {
+              padding: {
+                left: 5,
+                right: 10,
+                top: 0,
+                bottom: 0
+              },
+              responsive: true
+            },
+            animation: {
+              duration: 0, // general animation time
+            },
+            hover: {
+              animationDuration: 0, // duration of animations when hovering an item
+            },
+            responsiveAnimationDuration: 0, // animation duration after a resize
+            scales: {
+              xAxes: [{
+                display: false
+              }]
+              // yAxes: [{
+              //   gridLines: {
+              //     color: 'rgba(200,200,200,0.5)',
+              //     zeroLineColor: 'rgba(200,200,200,0.5)'
+              //   }
+              //
+              // }]
+            }
+          }
+        }
+        chartBitrate = new Chart(ctx, chartConfig);
+
+      }
+
+      // prepare datasets
+      var maxPoints = 0;
+      var colorNames = [
+        'rgba(255, 99, 132, 1)',
+        'rgba(54, 162, 235, 1)',
+        'rgba(255, 206, 86, 1)',
+        'rgba(75, 192, 192, 1)',
+        'rgba(153, 102, 255, 1)',
+        'rgba(255, 159, 64, 1)'];
+      chartConfig.data.datasets = [];
+      chartConfig.data.labels = [];
+      for (i = 0; i < reportData.streams.length; i++) {
+        var newColor = colorNames[i % colorNames.length];
+        var dataset = { label: reportData.streams[i].name, backgroundcolor: newColor, borderColor: newColor, data: reportData.streams[i].segment_bitrates, fill: false, pointRadius: 0 };
+        //dataset.data = reportData.streams[i].segment_bitrates.slice();
+        chartConfig.data.datasets.push(dataset);
+        if (reportData.streams[i].segment_bitrates.length > maxPoints) { maxPoints = reportData.streams[i].segment_bitrates.length; };
+      }
+      var points = (maxPoints > segment_delay) ? maxPoints - segment_delay : maxPoints;
+
+      var start_point = points - segments_to_graph;
+      if (start_point < 0) start_point = 0;
+
+      for (i = start_point; i < points; i++) { chartConfig.data.labels.push(i); };
+      chartConfig.options.scales.xAxes[0].display = bShowIndexInput;
+      chartBitrate.update();
+
+      var text = "";
+      var text_size = Math.round(document.getElementById("bitrateChart").getBoundingClientRect().height * 0.8 / (reportData.streams.length+1) - 0.5);
+      if (text_size > 18) text_size = 18;
+
+      for (i=0; i<reportData.streams.length;i++)
+       {
+         var newColor = colorNames[i%colorNames.length];
+         text += "<div style=\"color:"+newColor+"; font-size:"+text_size+"px;\">"+ reportData.streams[i].name + "</div>";
+         document.getElementById("currentBitrates").innerHTML = text;
+       }
+
+    }
+
+    //main player only
+    function updateHLSStat(viewerIdx) {
+      document.getElementById("HLSObject" + viewerIdx).innerHTML = "<div>HLS.js Fragment stat:</div>" +
+        "<div>Buffered Segment: " + hlsSegBuffered[viewerIdx] + "</div>" +
+        "<div>Changed Segment:  " + hlsSegChanged[viewerIdx] + "</div>" +
+        "<div>Est. Download Speed: " + Math.round(hlsBW[viewerIdx] / 1000) + "kbps</div>";
+      updateVideo();
+    }
+    //main player only
+    function updateVideo() {
+      var viewer0 = document.getElementById('viewer0');
+      var viewer1 = document.getElementById('viewer1');
+      videos[0] = document.getElementById('video0');
+      videos[1] = document.getElementById('video1');
+
+      // update video playback inputs
+      var newAllstreamnames = "";
+      for (i = 0; i < reportData.streams.length; i++) {
+        newAllstreamnames += reportData.streams[i].name;
+      }
+      if (allstreamnames != newAllstreamnames) {
+        allstreamnames = newAllstreamnames;
+        var selectStr = "<option value=-1>(None)</option>";
+        for (i = 0; i < reportData.streams.length; i++) {
+          selectStr += "<option value=" + i + ">" + reportData.streams[i].name + "</option>";
+          viewer_errors[i] = "";
+        }
+        viewer0.innerHTML = selectStr;
+        viewer1.innerHTML = selectStr;
+        if (reportData.streams.length > 0) viewer0.value = 0;
+        if (reportData.streams.length > 1) viewer1.value = 1;
+      }
+
+      // update container grid and visibility
+      var numActiveViewers = 0;
+      if (viewer0.value >= 0) {
+        document.querySelector("#video-item0").style.setProperty('display', 'block');
+        numActiveViewers++;
+      }
+      else {
+        document.querySelector("#video-item0").style.setProperty('display', 'none');
+      }
+      if (viewer1.value >= 0) {
+        document.querySelector("#video-item1").style.setProperty('display', 'block');
+        numActiveViewers++;
+      }
+      else {
+        document.querySelector("#video-item1").style.setProperty('display', 'none');
+      }
+      document.querySelector(".videos-container").style.setProperty('--numViewers', numActiveViewers);
+
+      // create / update video elements
+      var viewer_streams = new Array();
+      viewer_streams[0] = viewer0.value;
+      viewer_streams[1] = viewer1.value;
+      for (i = 0; i < 2; i++) {
+        if (viewer_streams[i] >= 0) {
+          var url = reportData.streams[viewer_streams[i]].videoURL;
+
+          var viewerSegmentBitrate = reportData.streams[viewer_streams[i]].segment_bitrates[reportData.streams[viewer_streams[i]].segment_bitrates.length - 1 - (reportData.last_sequence - hlsSegChanged[i])];
+          var videoInfoStr = reportData.streams[viewer_streams[i]].name + "<BR>" + "Bitrate (" + Math.round(reportData.window_seconds) + "s): " + viewerSegmentBitrate;
+          if (document.getElementById('showHLSJSstat').checked) { if (hls[i]) videoInfoStr += "<BR>Live Sync Pos: " + Math.round(hls[i].liveSyncPosition * 100) / 100; }
+          if (viewer_errors[i]) { videoInfoStr += viewer_errors[i]; }
+          document.getElementById('videoInfo' + i).innerHTML = videoInfoStr;
+
+          if (url != videoURLs[i]) {
+            // create / update video elements
+            videoURLs[i] = url;
+            videos[i] = document.getElementById('video' + i);
+
+            if (Hls.isSupported()) {
+              if (!hls[i]) {
+                hls[i] = new Hls();
+              }
+              var hls_data_funcstr = "var index=" + i + "; hlsSegBuffered[index]=data.frag.sn; hlsBW[index]=data.stats.bwEstimate; updateHLSStat(index);";
+              hls[i].on(Hls.Events.FRAG_BUFFERED, new Function("event", "data", hls_data_funcstr));
+
+              var hls_data_funcstr2 = "var index=" + i + "; hlsSegChanged[index]=data.frag.sn; updateHLSStat(index);";
+              hls[i].on(Hls.Events.FRAG_CHANGED, new Function("event", "data", hls_data_funcstr2));
+              hls[i].loadSource(url);
+              hls[i].attachMedia(videos[i]);
+              hls[i].on(Hls.Events.MANIFEST_PARSED, new Function("event", "data", "document.getElementById(\"video" + i + "\").play();"));
+              hls[i].on(Hls.Events.ERROR, new Function("event", "data", "console.log(data.details); console.log(data.reason); if (data.fatal) {viewer_errors[" + i + "] += \"<BR>\" + data.reason;};"));
+            }
+            // hls.js is not supported on platforms that do not have Media Source Extensions (MSE) enabled.
+            // When the browser has built-in HLS support (check using `canPlayType`), we can provide an HLS manifest (i.e. .m3u8 URL) directly to the video element throught the `src` property.
+            // This is using the built-in support of the plain video element, without using hls.js.
+            else if (videos[i].canPlayType('application/vnd.apple.mpegurl')) {
+              videos[i].src = url;
+              videos[i].addEventListener('canplay', function (event) {
+                event.target.play();
+              });
+            }
+          }
+        }
+        // no video selected
+        else {
+          if (hls[i]) {
+            hls[i].destroy();
+            hls[i] = null;
+            videoURLs[i] = "";
+          }
+        }
+      }
+    }
+
+    function updateData() {
+      //reportData = JSON.parse(report_json_string);
+      //updateData();
+      var bAutoRefresh = true
+      var newData;
+      var urls;
+
+      // if (document.getElementById("datafile").innerHTML == "")
+        // document.getElementById("datafile").innerHTML = report_data_path;
+
+      xhttp.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) {
+          newData = JSON.parse(this.responseText);
+
+          if (newData.version == data_version_string) {
+            reportData = JSON.parse(this.responseText);
+
+            if (reportData.timestamp != lastReportTimestamp) {
+              console.log("lastReportTimestamp " + lastReportTimestamp);
+              //report_length_seconds = Date.parse(reportData.timestamp) - Date.parse(reportData.begin_timestamp);
+              //If VOD calculate the report length a little differently. Go by the number of segments and window time
+              report_length_seconds = reportData.window_seconds * reportData.last_sequence;
+
+              console.log("report_length_seconds" + report_length_seconds);
+              //document.getElementById("datafile").innerHTML = report_data_path + ": (" + reportData.begin_timestamp + " - " + reportData.timestamp + ")";
+              document.getElementById("heading1").innerHTML = reportData.heading1;
+              //document.getElementById("heading2").innerHTML = reportData.heading2;
+              printAvgTable();
+              updateView();
+              updateVideo();
+              lastReportTimestamp = reportData.timestamp;
+              autoRefreshInterval = reportData.window_seconds * 1000 / 2;
+            }
+          }
+        }
+        if (bAutoRefresh) {
+          if (updateTimer)
+            clearTimeout(updateTimer);
+          updateTimer = setTimeout(updateData, autoRefreshInterval);
+        }
+      };
+
+      xhttp.open("GET", report_data_path + "?t=" + Math.random(), true);
+      xhttp.send();
+    }
+
+
+    function updateView() {
+      onHLSJSstatChange();
+      drawBitrateGraph();
+    }
+    function onViewerChange(viewerIdx) {
+      viewer_errors[viewerIdx] = "";
+      updateVideo();
+    }
+
+    function onBitrateChartChange() {
+      if (document.getElementById("showBitrateChart").checked) {
+        document.getElementById("content-overlay-bottom").style.visibility = "visible";
+      } else {
+        document.getElementById("content-overlay-bottom").style.visibility = "hidden";
+      }
+    }
+
+    function onSegmentBitrateChange() {
+      if (document.getElementById("showSegmentBitrate")) {
+        if (document.getElementById("showSegmentBitrate").checked) {
+          document.getElementById("videoInfo0").style.visibility = "visible";
+          document.getElementById("videoInfo1").style.visibility = "visible";
+        } else {
+          document.getElementById("videoInfo0").style.visibility = "hidden";
+          document.getElementById("videoInfo1").style.visibility = "hidden";
+        }
+      }
+    }
+
+    function onHLSJSstatChange() {
+      if (document.getElementById("showHLSJSstat")) {
+        if (document.getElementById("showHLSJSstat").checked) {
+          document.getElementById("HLSObject0").style.visibility = "visible";
+          document.getElementById("HLSObject1").style.visibility = "visible";
+        } else {
+          document.getElementById("HLSObject0").style.visibility = "hidden";
+          document.getElementById("HLSObject1").style.visibility = "hidden";
+        }
+      }
+    }
+
+    function syncVideos() {
+      if (document.getElementById("viewer0").value >= 0 &&
+        document.getElementById("viewer1").value >= 0 &&
+        videos[0] && videos[1]) {
+        syncpos0 = Math.round(hls[0].liveSyncPosition * 10);
+        syncpos1 = Math.round(hls[1].liveSyncPosition * 10);
+        if (syncpos0 && syncpos1 && (syncpos0 != syncpos1)) {
+          hls[0].destroy();
+          hls[1].destroy();
+          hls = [null, null];
+          videoURLs = ["", ""]
+          updateVideo();
+        }
+        else {
+          videos[0].pause();
+          videos[1].pause();
+          var currentVidTime = videos[0].currentTime;
+          videos[0].currentTime = currentVidTime;
+          videos[1].currentTime = currentVidTime;
+          videos[0].play();
+          videos[1].play();
+        }
+      }
+    }
+
+    function playVideos() {
+      for (i = 0; i < 2; i++) {
+        if (videos[i]) {
+          videos[i].play();
+        }
+      }
+    }
+
+    function pauseVideos() {
+      for (i = 0; i < 2; i++) {
+        if (videos[i]) {
+          videos[i].pause();
+        }
+      }
+    }
+  </script>
+</head>
+
+<body onload="onInit()" onresize="updateView()">
+
+  <div class="content-bkg">
+    <div class="content">
+      <div class="content-overlay-top">
+        <div id="topNAV">
+          <a class="currentlink" href="qvbr2_vod_video_bitrate_player.html" id="playerlink">Viewer</a>
+          <BR>
+          <a class="otherlink" href="qvbr2_vod_report_aws.html" id="thumbslink">Thumbs</a>
+        </div>
+        <div style>
+          <H1 id="heading1">Bitrate report Title</H1>
+          <H5 id="heading2"></H5>
+          <form>Playing:
+            <select id="viewer0" name="viewer0" onchange="onViewerChange(0)">
+              <option value=-1 selected>(None)</option>
+            </select>
+            <select id="viewer1" name="viewer1" onchange="onViewerChange(1)">
+              <option value=-1 selected>(None)</option>
+            </select>
+            <button type="button" id="playvideo" onclick="playVideos()">Play</button>
+            <button type="button" id="pausevideo" onclick="pauseVideos()">Pause</button>
+            <button type="button" id="syncvideo" onclick="syncVideos()">Sync</button>
+          </form>
+
+        </div>
+        <div>
+          <H5 id="datafile"></H5>
+          <table id="output_avg"></table>
+        </div>
+        <div style="justify-self: right">
+          <form>
+            <input type="checkbox" id="showSegmentBitrate" onchange="onSegmentBitrateChange()" checked>Show Segment Bitrates
+            <BR>
+            <input type="checkbox" id="showBitrateChart" onchange="onBitrateChartChange()" checked>Show Bitrate Chart
+            <BR>
+            <input type="checkbox" id="showHLSJSstat" onchange="onHLSJSstatChange()">Show HLS.js statistics
+          </form>
+          <div id="videoURLs" style="visibility:hidden;"></div>
+        </div>
+      </div>
+      <div class="content-overlay-bottom" id="content-overlay-bottom">
+          <div>
+          <!-- <div class="chart-container" style="position:relative; margin:auto; width:130vw">   -->
+          <div class="bitrateChartTitle" id="bitrateChartTitle">Segment bitrates</div>
+          <canvas id="bitrateChart" height=25px></canvas>
+        </div>
+        <div>
+          <div></div>
+          <div id="currentBitrates"></div>
+        </div>
+      </div>
+      <div class="videos-container">
+        <div id="video-item0" class="videos-item" style="display:block">
+          <video id="video0" muted controls></video>
+          <div class="videoInfoOverlay" style="visibility:visible;" id="videoInfo0"></div>
+          <div class="hlsjsoverlay" style="visibility:hidden;" id="HLSObject0"></div>
+        </div>
+        <div id="video-item1" class="videos-item" style="display:block">
+          <video id="video1" muted controls></video>
+          <div class="videoInfoOverlay" style="visibility:visible;" id="videoInfo1"></div>
+          <div class="hlsjsoverlay" style="visibility:hidden;" id="HLSObject1"></div>
+        </div>
+        <div>
+        </div>
+      </div>
+</body>
+
+</html>

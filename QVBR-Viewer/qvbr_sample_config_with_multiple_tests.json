@@ -1,0 +1,64 @@
+{
+  "data_folder" : "data", //the directory inside the bucket where encoder output will be written
+  "tests": {
+    "test": { //default directory name created by the template which is the a subdirectory under the data_folder where output streams will be written; this must match the output directory provided in the encoder;
+              //this path can be replaced with a name of your choosing but you must edit the encoder output destination to match
+      "stat_trigger_minute": 0,
+      "dynamo_table": "", //after Install Lambda runs, this will have the name of your bucket with "db" appended to it
+      "heading1": "QVBR Viewer Sample Config Test",
+      "heading2": "Config: AVC 720p CBR, QVBR 720p Q8, QVBR 720p Q7",
+      "segment_duration_sec": 10, //should match the segment length specified in the encoder
+      "streams": [
+        {
+          "stream_prefix": "avc-cbr", // HLS stream prefix of the CBR output; this must match the stream prefix provided in the encoder; this must also match the filename of the videoURL below; must not have underscores 
+          "label": "CBR",
+          "videoURL": "test/avc-cbr.m3u8" //after Install Lambda runs, this will have the full URL of the HLS manifest from your S3 bucket
+        },
+        {
+          "stream_prefix": "avc-qvbr6",
+          "label": "QVBR Q6",
+          "videoURL": "test/avc-qvbr6.m3u8"
+        },
+        {
+          "stream_prefix": "avc-qvbr7",
+          "label": "QVBR Q7",
+          "videoURL": "test/avc-qvbr7.m3u8"
+        },
+        {
+          "stream_prefix": "avc-qvbr8",
+          "label": "QVBR Q8",
+          "videoURL": "test/avc-qvbr8.m3u8"
+        }
+      ]
+    },
+    "new_test_name":{ //can have more than one test output
+      "stat_trigger_minute": 0,
+      "dynamo_table": "", //after Install Lambda runs, this will have the name of your bucket with "db" appended to it
+      "heading1": "QVBR Viewer Sample Config Test2",
+      "heading2": "Config: HEVC 720p CBR, QVBR 720p Q8, QVBR 720p Q7",
+      "segment_duration_sec": 10, //should match the segment length specified in the encoder
+      "streams": [
+        {
+          "stream_prefix": "hevc-cbr", // HLS stream prefix of the CBR output; this must match the stream prefix provided in the encoder; this must also match the filename of the videoURL below; must not have underscores 
+          "label": "CBR",
+          "videoURL": "new_test_name/hevc-cbr.m3u8" //after Install Lambda runs, this will have the full URL of the HLS manifest from your S3 bucket
+        },
+        {
+          "stream_prefix": "hevc-qvbr6",
+          "label": "QVBR Q6",
+          "videoURL": "new_test_name/hevc-qvbr6.m3u8"
+        },
+        {
+          "stream_prefix": "hevc-qvbr7",
+          "label": "QVBR Q7",
+          "videoURL": "new_test_name/hevc-qvbr7.m3u8"
+        },
+        {
+          "stream_prefix": "hevc-qvbr8",
+          "label": "QVBR Q8",
+          "videoURL": "new_test_name/hevc-qvbr8.m3u8"
+        }
+      ]    
+    }
+  }
+}

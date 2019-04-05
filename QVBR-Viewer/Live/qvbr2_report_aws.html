@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="icon" href="favicon.ico">
+  <style>
+  body {font-family: "lucida grande","lucida sans unicode",helvetica,arial,sans-serif; font-size: 13px; margin:0 auto; background-color:#333; }
+  a { color: rgb(255,154,0);}
+   .content {
+     background-color:#333; color: rgb(255,154,0);
+     position: relative;
+     width: 100%;
+     margin: 0 auto;
+   }
+   .videos-container {
+     width: 100%;
+     display: grid;
+     grid-template-columns: 1fr 1fr;
+     grid-gap: 0px 0px;
+   }
+
+  .content-overlay-top {
+    width: 100%;
+    margin: 0 auto;
+    position: sticky;
+    background-color:rgba(0,0,0,0.5); color: rgb(255,154,0);
+    top: 0;
+    display: grid;
+    grid-template-columns: 5% 25% 45% 20%;
+    align-items: center;
+    justify-items: center;
+    z-index: 100;
+  }
+
+   #topNAV a:link, #topNAV a:visited {
+     width: 5em;
+     height: 1.5em;
+     padding: 1px 3px;
+     text-align: left;
+     text-decoration: none;
+     display: inline-block;
+   }
+
+   #topNAV a:hover, #topNAV a:active {
+     background-color: rgba(255,154,0, 0.8);
+     color: rgb(255,255,255);
+   }
+
+   #topNAV .currentlink {
+     background-color: rgba(255,154,0, 0.8);
+     color: rgb(255,255,255);
+   }
+
+   #topNAV .otherlink {
+     color: rgb(255,154,0);
+   }
+  .content-overlay-top table, .content-overlay-top th, .content-overlay-top td { border: 1px solid rgb(255,154,0); text-align: center;}
+
+  .content-bkg { background-color:#ffffff; margin:0 auto;}
+  .content     { background-color:#ffffff; color: #333; margin:5px;}
+  .smalltextinput, textarea { background-color:#333; color: rgb(255,154,0);  border-style:none; }
+  .highlight_text { color: rgb(255,154,0); font: bold; }
+  .menu { background-color:#333; color: rgb(255,154,0); margin:0 auto; padding: 2px;}
+  table { border-collapse: collapse; }
+  .content table, .content th, .content td { border: 1px solid #333; text-align: center;}
+  .thumbnail { position: relative; width: 100%; padding: 0; margin: 0;}
+  .thumbnail > div {position: absolute; bottom: 8px; left: 0; width: 100%; margin: auto;}
+  .thumbnail > div > span {margin: auto; padding: 1px;
+                   color: white;
+                   background: rgb(0, 0, 0); /* fallback color */
+                   background: rgba(0, 0, 0, 0.3);
+                   }
+
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.min.js"></script>
+  <script>
+     var data_version_string = "qvbr2";
+     var lastReportTimestamp = "";
+     var autoRefreshInterval = 5000;
+     var xhttp = new XMLHttpRequest();
+     var chartBitrate = undefined;
+     var chartConfig;
+     var report_config = "qvbr2_config.json"
+     var report_data_path = "";
+     var report_data_fname = "report_data.json";
+     var updateTimer = null;
+     var columns = 3;
+     var segment_delay = 1;
+     var reportData;
+     var report_length_seconds = 0;
+
+     var getQueryString = function ( field, url ) {
+        var href = url ? url : window.location.href;
+        var reg = new RegExp( '[?&]' + field + '=([^&#]*)', 'i' );
+        var string = reg.exec(href);
+        return string ? string[1] : null;
+     };
+
+     function pad(n, width, z) {
+       z = z || '0';
+       n = n + '';
+       return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+     }
+
+     function getImgFilename(index)
+     {
+       var name = "./images/" + pad(index, 4) + ".jpg";
+       return name;
+     }
+
+     function printThumbTable()
+     {
+       var thumbsInput = document.getElementById("numThumbsInput");
+       var numThumbsInput = Number(thumbsInput.value);
+
+       var bShowIndexInput = document.getElementById("showIndexInput").checked;
+
+       var tableElem = document.getElementById("thumbTbl");
+       tableElem.innerHTML = "";
+       // print table header
+       var header = "<tr>";
+       for (c=0; c<columns; c++)
+       {
+         header += "<th>"+reportData.window_seconds+"s measurement</th>";
+         for (i=0; i<reportData.streams.length;i++)
+         {
+           header += "<th>"+reportData.streams[i].name+"<p>(mbps)</th>";
+         }
+       }
+       header += "</tr>";
+       //console.log(tableElem.innerHTML);
+       tableElem.innerHTML += header;
+
+       // find max datasize length
+       var max_data=0;
+       for (i=0; i<reportData.streams.length;i++)
+       {
+         if (reportData.streams[i].segment_bitrates.length>max_data) max_data=reportData.streams[i].segment_bitrates.length;
+       }
+       if (max_data>=segment_delay)
+         max_data = max_data - segment_delay;
+
+       var max_thumbs=max_data;
+       if (max_thumbs > numThumbsInput)
+         max_thumbs = numThumbsInput;
+
+       // populate table data
+       for (i=0; i<max_thumbs; i+=columns)
+       {
+         var string = "<tr>";
+         for (c=0; c<columns; c++)
+         {
+           var item = max_data-(i+c+1);
+           if (item >= 0)
+           {
+              var itemText = "";
+              if (bShowIndexInput) {
+                itemText = item;
+              }
+              string += "<td><div class=\"thumbnail\"><img src=\"" + reportData.thumb_tag + reportData.thumbs[item] + "\"><div><span>"+itemText+"</span></div></div></td>";
+
+              for (dset=0; dset<reportData.streams.length;dset++)
+              {
+                  if (item < reportData.streams[dset].segment_bitrates.length) {
+                    string += "<td>"+ reportData.streams[dset].segment_bitrates[item] + "</td>";
+                  }
+                  else {
+                    string += "<td></td>";
+                  }
+                  //console.log(dset + ":" + item + ":" + string);
+              }
+            }
+         }
+
+         string+="</tr>";
+         tableElem.innerHTML += string;
+
+         // test table width, adjust column if there is room left
+         var new_columns  = Math.floor(window.innerWidth / (tableElem.getBoundingClientRect().width / columns));
+         if (new_columns != columns)
+         {
+            columns = new_columns;
+            updateView();
+         }
+       }
+     }
+
+     function getTimeIntervalString(interval_msec)
+     {
+       seconds = Math.round(interval_msec / 1000);
+
+       minutes = Math.round(seconds / 60);
+       days = Math.floor(minutes / (24 * 60));
+       hours = Math.floor(minutes / 60) % 24;
+       minutes = minutes % 60;
+
+       var timeStr = "";
+
+       if (seconds >=60) {
+         if (days) timeStr += ((timeStr)? " " : "") + days + " d";
+         if (hours) timeStr += ((timeStr)? " " : "") + hours + " hr";
+         if (minutes) timeStr += ((timeStr)? " " : "") + minutes + " min";
+       }
+       else {
+         timeStr += seconds + "s";
+       }
+
+       return timeStr;
+     }
+
+     function printAvgTable()
+     {
+       document.getElementById("output_avg").innerHTML = "";
+
+       var averagestr = "<tr><th>Video ES Bitrate</th>";
+       for (i=0; i<reportData.streams.length;i++)
+       {
+         averagestr += "<th>" + reportData.streams[i].name + " (<a href=\""+ reportData.streams[i].videoURL+ "\">url</a>)</th>";
+       }
+       averagestr += "</tr>";
+       averagestr += "<tr><th>" + getTimeIntervalString(report_length_seconds) + " Average</th>";
+       for (i=0; i<reportData.streams.length;i++)
+       {
+         averagestr += "<td>" + reportData.streams[i].bitrate + "mbps</td>";
+       }
+       averagestr += "</tr>";
+       averagestr += "<tr><th>Savings</th><td></td>";
+       for (i=1; i<reportData.streams.length;i++)
+       {
+         averagestr += "<td class=\"highlight_text\">" + Math.round((reportData.streams[i].bitrate/reportData.streams[0].bitrate-1)*100) + "%</td>";
+       }
+       averagestr += "</tr>";
+       document.getElementById("output_avg").innerHTML += averagestr;
+     }
+
+     function drawBitrateGraph()
+     {
+       var bShowIndexInput = document.getElementById("showIndexInput").checked;
+
+       var ctx = document.getElementById("bitrateChart");
+       var datasets = [];
+
+       //Chart.defaults.global.defaultFontColor = '#ece7e7';
+
+       if (chartBitrate == undefined)
+       {
+          chartConfig = {
+            type: 'line',
+            data: {
+              labels: [],
+              datasets: []
+            },
+            options: {
+              layout: {
+                  padding: {
+                      left: 5,
+                      right: 5,
+                      top: 0,
+                      bottom: 20
+                  }
+              },
+              animation: {
+                duration: 0, // general animation time
+              },
+              hover: {
+                animationDuration: 0, // duration of animations when hovering an item
+              },
+              responsiveAnimationDuration: 0, // animation duration after a resize
+              scales: {
+                xAxes: [{
+                  display: false
+                }]
+                // yAxes: [{
+                //   gridLines: {
+                //     color: 'rgba(200,200,200,0.5)',
+                //     zeroLineColor: 'rgba(200,200,200,0.5)'
+                //   }
+                //
+                // }]
+              }
+            }
+          }
+          chartBitrate = new Chart(ctx, chartConfig);
+
+       }
+
+       // prepare datasets
+       var maxPoints = 0;
+       var colorNames = [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'];
+       chartConfig.data.datasets = [];
+       chartConfig.data.labels   = [];
+       for (i=0; i<reportData.streams.length;i++)
+       {
+         var newColor = colorNames[i%colorNames.length];
+         var dataset = { label: reportData.streams[i].name, backgroundcolor: newColor, borderColor: newColor, data: reportData.streams[i].segment_bitrates, fill:false, pointRadius:0};
+         //dataset.data = reportData.streams[i].segment_bitrates.slice();
+         chartConfig.data.datasets.push(dataset);
+         if (reportData.streams[i].segment_bitrates.length > maxPoints) {maxPoints = reportData.streams[i].segment_bitrates.length;};
+       }
+       var points = (maxPoints > segment_delay)? maxPoints-segment_delay : maxPoints;
+       for (i=0;i<points;i++) {chartConfig.data.labels.push(i);};
+       chartConfig.options.scales.xAxes[0].display = bShowIndexInput;
+       chartBitrate.update();
+     }
+
+     function updateData()
+     {
+       //reportData = JSON.parse(report_json_string);
+       //updateData();
+       var bAutoRefresh = document.getElementById("autoRefreshInput").checked;
+       var newData;
+
+       if (document.getElementById("datafile").innerHTML == "")
+          document.getElementById("datafile").innerHTML = report_data_path;
+
+       xhttp.onreadystatechange = function() {
+         if (this.readyState == 4 && this.status == 200) {
+           newData = JSON.parse(this.responseText);
+
+           if (newData.version == data_version_string) {
+             reportData = JSON.parse(this.responseText);
+             if (reportData.timestamp != lastReportTimestamp)
+             {
+                report_length_seconds = Date.parse(reportData.timestamp) - Date.parse(reportData.begin_timestamp);
+                document.getElementById("datafile").innerHTML = report_data_path + ": ("+reportData.begin_timestamp+" - "+reportData.timestamp+")";
+                document.getElementById("heading1").innerHTML = reportData.heading1;
+                document.getElementById("heading2").innerHTML = reportData.heading2;
+                printAvgTable();
+                updateView();
+                lastReportTimestamp = reportData.timestamp;
+                autoRefreshInterval = reportData.window_seconds*1000/2;
+              }
+            }
+         }
+         if (bAutoRefresh) {
+           if (updateTimer)
+              clearTimeout(updateTimer);
+           updateTimer = setTimeout(updateData, autoRefreshInterval);
+         }
+       };
+
+       xhttp.open("GET",report_data_path+"?t="+Math.random(), true);
+       xhttp.send();
+     }
+
+     function updateView()
+     {
+       drawBitrateGraph();
+       printThumbTable();
+     }
+
+     function updateAutoRefresh()
+     {
+       var bAutoRefresh = document.getElementById("autoRefreshInput").checked;
+       if (bAutoRefresh) {
+         updateData();
+       }
+       else {
+         if (updateTimer)
+            clearTimeout(updateTimer);
+       }
+     }
+
+     function updateNavLinks(testname)
+     {
+       var link;
+       link = document.getElementById("playerlink").href.split("?");
+       document.getElementById("playerlink").href = link[0]+"?data="+testname+"/"+"report_data.json";
+       link = document.getElementById("thumbslink").href.split("?");
+       document.getElementById("thumbslink").href = link[0]+"?data="+testname+"/"+"report_data.json";
+       link = document.getElementById("statslink").href.split("?");
+       document.getElementById("statslink").href = link[0]+"?data="+testname+"/"+"stat_data.json";
+     }
+
+     function parseConfigJSON(configData)
+     {
+       var tests = [];
+       var test;
+       for (test in configData.tests)
+       {
+         tests.push(configData.data_folder + "/" + test);
+       }
+       console.log(tests.join(","));
+       return tests;
+     }
+
+     function onInit()
+     {
+       var url_param = getQueryString('data');
+       if (url_param) {
+          report_data_path = url_param;
+          var url_tags = report_data_path.split("/");
+          url_tags.pop();
+          updateNavLinks(url_tags.join("/"));
+          updateData();
+        }
+       else {
+          // load from config
+          xhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+              var configData = JSON.parse(this.responseText);
+              var tests = parseConfigJSON(configData);
+              report_data_path = tests[0] + "/" + report_data_fname;
+              updateNavLinks(tests[0]);
+              updateData();
+            }
+          };
+
+          xhttp.open("GET",report_config+"?t="+Math.random(), true);
+          xhttp.send();
+       }
+     }
+
+  </script>
+</head>
+<body onload="onInit()" onresize="updateView()">
+  <div class="content-overlay-top">
+    <div id="topNAV">
+      <a class="otherlink" href="qvbr2_video_bitrate_player.html" id="playerlink">Viewer</a><BR>
+      <a class="currentlink" href="qvbr2_report_aws.html" id="thumbslink">Thumbs</a><BR>
+      <a class="otherlink" href="qvbr2_stats.html"  id="statslink">Stats</a><BR>
+    </div>
+    <div>
+      <H1 id="heading1" >Bitrate report Title</H1>
+      <H5 id="heading2">Config: </H5>
+    </div>
+    <div><H5 id="datafile"></H5>
+      <table id="output_avg"></table></div>
+    <div>
+    </div>
+  </div>
+  <div class="content-bkg">
+    <div class="content">
+      <div>Note: Per-segment bitrate measurement may exceed max bitrate setting due to HRD CPB buffer.</div>
+      <div><canvas id="bitrateChart" height=50></canvas></div>
+    </div>
+    <div class="menu">
+      <form>
+         Thumbnails: <input type="number" id="numThumbsInput" min="1" max="100000" value="400" step="1" onchange="updateView()" class="smalltextinput" style="width:40px;" >
+         <input type="checkbox" id="showIndexInput" onchange="updateView()">Show Segment Index
+         <input type="checkbox" id="autoRefreshInput" onchange="updateAutoRefresh()" checked>Auto Refresh
+      </form>
+    </div>
+    <div class="content">
+        <table id="thumbTbl"></table>
+    </div>
+  </div>
+</body>
+</html>

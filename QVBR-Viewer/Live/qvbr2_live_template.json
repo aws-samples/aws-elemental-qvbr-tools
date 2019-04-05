@@ -1,0 +1,519 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "QVBR Live Viewer",
+    "Parameters": {
+        "QVBRS3BucketName": {
+            "Type": "String",
+            "Default": "qvbr-test-bucket",
+            "AllowedPattern": "[a-z0-9\\-]+",
+            "Description": "New S3 bucket name to host HLS streams, thumbnails, and QVBR webpages"
+        }
+    },
+    "Resources": {
+        "dynamoQvbrData": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "segment_id",
+                        "AttributeType": "S"
+                    },
+                    {
+                        "AttributeName": "testname",
+                        "AttributeType": "S"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": "testname",
+                        "KeyType": "HASH"
+                    },
+                    {
+                        "AttributeName": "segment_id",
+                        "KeyType": "RANGE"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": "60",
+                    "WriteCapacityUnits": "10"
+                },
+                "TableName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "QVBRS3BucketName"
+                            },
+                            "db"
+                        ]
+                    ]
+                }
+            }
+        },
+        "iamLambdaRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "root",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "lambdaDataCollect": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                               "rodeolabz",
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": "qvbr/live/qvbr_resources.zip"
+                },
+                "Description": "QVBR data ingest into Dynamo DB",
+                "Environment": {
+                    "Variables": {
+                        "REPORT_DURATION_HOUR": 0.5,
+                        "QVBR_REPORT_FUNCTION": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "QVBRS3BucketName"
+                                    },
+                                    "qvbr_report"
+                                ]
+                            ]
+                        },
+                        "QVBR_STAT_FUNCTION": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "QVBRS3BucketName"
+                                    },
+                                    "qvbr_stat"
+                                ]
+                            ]
+                        }
+                    }
+                },
+                "FunctionName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "QVBRS3BucketName"
+                            },
+                            "datacollect"
+                        ]
+                    ]
+                },
+                "Handler": "qvbr2_datacollect.lambda_handler",
+                "MemorySize": 1024,
+                "Role": {
+                    "Fn::GetAtt": [
+                        "iamLambdaRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python2.7",
+                "Timeout": 300
+            }
+        },
+        "lambdaReport": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                "rodeolabz",
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": "qvbr/live/qvbr_resources.zip"
+                },
+                "Description": "QVBR short-term reporting",
+                "Environment": {
+                    "Variables": {
+                        "REPORT_DURATION_HOUR": 0.5
+                    }
+                },
+                "FunctionName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "QVBRS3BucketName"
+                            },
+                            "qvbr_report"
+                        ]
+                    ]
+                },
+                "Handler": "qvbr2_report.lambda_handler",
+                "MemorySize": 1024,
+                "Role": {
+                    "Fn::GetAtt": [
+                        "iamLambdaRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python2.7",
+                "Timeout": 300
+            }
+        },
+        "lambdaStat": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                "rodeolabz",
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": "qvbr/live/qvbr_resources.zip"
+                },
+                "Description": "QVBR long-term statistics",
+                "Environment": {
+                    "Variables": {
+                        "REPORT_DURATION_HOUR": 168
+                    }
+                },
+                "FunctionName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "QVBRS3BucketName"
+                            },
+                            "qvbr_stat"
+                        ]
+                    ]
+                },
+                "Handler": "qvbr2_stats.lambda_handler",
+                "MemorySize": 1024,
+                "Role": {
+                    "Fn::GetAtt": [
+                        "iamLambdaRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python2.7",
+                "Timeout": 300
+            }
+        },
+        "lambdaPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "lambdaDataCollect",
+                        "Arn"
+                    ]
+                },
+                "Principal": "s3.amazonaws.com",
+                "SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                }
+            }
+        },
+        "s3QvbrBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Ref": "QVBRS3BucketName"
+                },
+                "AccessControl": "Private",
+                "CorsConfiguration": {
+                    "CorsRules": [
+                        {
+                            "AllowedMethods": [
+                                "GET"
+                            ],
+                            "AllowedOrigins": [
+                                "*"
+                            ]
+                        }
+                    ]
+                },
+                "NotificationConfiguration": {
+                    "LambdaConfigurations": [
+                        {
+                            "Event": "s3:ObjectCreated:*",
+                            "Filter": {
+                                "S3Key": {
+                                    "Rules": [
+                                        {
+                                            "Name": "prefix",
+                                            "Value": "data/"
+                                        },
+                                        {
+                                            "Name": "suffix",
+                                            "Value": "ts"
+                                        }
+                                    ]
+                                }
+                            },
+                            "Function": {
+                                "Fn::GetAtt": [
+                                    "lambdaDataCollect",
+                                    "Arn"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "VersioningConfiguration": {
+                    "Status": "Suspended"
+                }
+            }
+        },
+        "s3QvbrBucketPolicy" : {
+            "Type" : "AWS::S3::BucketPolicy",
+            "Properties" : {
+              "Bucket" : {"Ref" : "QVBRS3BucketName"},
+              "PolicyDocument": {
+                "Statement":[{
+                  "Action":["s3:GetObject"],
+                  "Effect":"Allow",
+                  "Resource": { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "QVBRS3BucketName" } , "/*" ]]},
+                  "Principal": {
+                    "CanonicalUser": {
+                        "Fn::GetAtt": [
+                            "CloudFrontOriginAccessIdentity",
+                            "S3CanonicalUserId"
+                        ]
+                        }
+                    }
+                }]
+              }
+            }
+          },          
+        "lambdaInstall": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [   
+                                "rodeolabz",
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": "qvbr/live/qvbr_resources.zip"
+                },
+                "Description": "QVBR install script for cloudformation",
+                "FunctionName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "QVBRS3BucketName"
+                            },
+                            "qvbr_install"
+                        ]
+                    ]
+                },
+                "Handler": "qvbr2_install.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "iamLambdaRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "python2.7",
+                "Timeout": 300
+            }
+        },
+        "installScript": {
+            "DependsOn": [
+                "s3QvbrBucket",
+                "dynamoQvbrData",
+                "s3QvbrBucketPolicy"
+            ],
+            "Type": "Custom::installScript",
+            "Properties": {
+                "ServiceToken": {
+                    "Fn::GetAtt": [
+                        "lambdaInstall",
+                        "Arn"
+                    ]
+                },
+                "sourceS3Bucket": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "rodeolabz",
+                            {
+                                "Ref": "AWS::Region"
+                            }
+                        ]
+                    ]
+                },
+                "sourceS3Path": "qvbr/live/website",
+                "s3bucket": {
+                    "Ref": "QVBRS3BucketName"
+                },
+                "dynamoTablename": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "QVBRS3BucketName"
+                            },
+                            "db"
+                        ]
+                    ]
+                },
+                "region": {
+                    "Fn::Join": [
+                        ".",
+                        [
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            {
+                                "Ref": "AWS::URLSuffix"
+                            }
+                        ]
+                    ]
+                },
+                "CloudFrontDomain": {"Fn::Sub": "https://${CloudFront.DomainName}"}
+            }
+        },
+        "CloudFront": {
+            "Type": "AWS::CloudFront::Distribution",
+            "Properties": {
+                "DistributionConfig": {
+                    "Comment": "CloudFront for QVBR S3 Bucket",
+                    "Origins": [
+                        {
+                            "Id": "QVBR",
+                            "DomainName": {
+                                "Fn::Join": [
+                                    ".",
+                                    [
+                                        {
+                                        "Ref": "QVBRS3BucketName"
+                                        },
+                                        "s3.amazonaws.com"
+                                    ]
+                                ]
+                            },
+                            "S3OriginConfig" : {
+                                "OriginAccessIdentity" : {
+                                    "Fn::Sub":"origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+                                }
+                            }
+                        }
+                    ],
+                    "Enabled": "true",
+                    "DefaultCacheBehavior": {
+                        "TargetOriginId": "QVBR",
+                        "ForwardedValues": {
+                            "QueryString": "false",
+                            "Cookies": {
+                                "Forward": "none"
+                            }
+                        },
+                        "ViewerProtocolPolicy": "allow-all",
+                        "DefaultTTL": "5",
+                        "MinTTL": "0",
+                        "MaxTTL": "5"
+                    }
+                }
+            }
+        },
+        "CloudFrontOriginAccessIdentity": {
+            "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
+            "Properties": {
+                "CloudFrontOriginAccessIdentityConfig": {
+                    "Comment": {"Ref": "QVBRS3BucketName"}
+                }
+            }
+        }
+
+    },
+    "Outputs": {
+        "QVBRViewerURL": {
+            "Value": {
+                "Fn::Join": [
+                    "/",
+                    [
+                        {"Fn::Sub": "https://${CloudFront.DomainName}"},
+                        "qvbr2_video_bitrate_player.html"
+                    ]
+                ]
+            },
+            "Description": "QVBR Viewer URL"
+        },
+        "QVBRS3Bucket": {
+            "Value": {
+                "Fn::Join": [
+                    "/",
+                    [
+                        "https://console.aws.amazon.com/s3/buckets",
+                        {"Ref": "QVBRS3BucketName"}
+                    ]
+                ]
+            },
+            "Description": "Console link to QVBR S3 Bucket"
+        }
+    }
+}
