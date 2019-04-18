@@ -2,7 +2,7 @@
 
 Quality-defined variable bitrate (QVBR) control is a new rate control mode that is currently available in the AWS Elemental MediaLive and AWS Elemental MediaConvert, as well as the AWS Elemental Live and AWS Elemental Server products. To learn more QVBR in MediaConvert, check out [this page](https://docs.aws.amazon.com/mediaconvert/latest/ug/cbr-vbr-qvbr.html). 
 
-The visualization tool provided here ultimately produces a webpage that shows the comparative bitrate usage of the HLS videos generated using different rate control modes against QVBR in realtime. This then allows the user to see the bitrate savings one can get from using QVBR mode.
+The visualization tool provided here ultimately produces a webpage that shows the comparative bitrate usage of the different QVBR levels against tradional rate control settings like CBR, for the entire asset. This, then, allows the user to see the bitrate savings one can get from using QVBR mode. The viewer also includes a side-by-side player that allows the user to watch the same content encoded with different rate control modes for a quick visual quality comparison.
 
 
 ## Limitations and Assumptions
